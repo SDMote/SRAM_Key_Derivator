@@ -1,19 +1,13 @@
 `timescale 1ns / 1ps
 //////////////////////////////////////////////////////////////////////////////////
-// Company: 
-// Engineer: 
+// Engineer: Alfonso Cortés
 // 
-// Create Date: 17.11.2025 17:02:10
-// Design Name: 
+// Create Date: 09.12.2025
+// Design Name: sram_puf
 // Module Name: tmvs_tb
-// Project Name: 
-// Target Devices: 
-// Tool Versions: 
+// Project Name: riscv
 // Description: 
 // 
-// Dependencies: 
-// 
-// Revision:
 // Revision 0.01 - File Created
 // Additional Comments:
 // 
@@ -42,15 +36,40 @@ module tmvs_tb();
     logic [MAX_CODE_SIZE-1:0] codeword;
     logic [BOOK_INDX_SIZE-1:0] code_index;
     logic [MAX_KEY_SIZE-1:0] key;
+    logic on_reg;
+    int i;
+    string file_name;
         
     assign codeword = codebook[code_index];
     always #5 clk = ~clk;
+    
+    always_ff @(posedge clk) begin
+        if(rst) begin
+            on_reg <= 1'b0;
+            i = 0;
+            file_name = {"L45_", $sformatf("%0d", i), ".mem"};
+            $display("reading memory L45_%0d", i);
+            $readmemh(file_name, DUT.Memory.i_SRAM_1P_behavioral_bm_bist.memory);
+        end
+        else begin
+            on_reg <= DUT.on;
+            if((DUT.on == 1'b0) && (on_reg == 1'b1)) begin
+                if(i == 3)
+                    i = 0;
+                else
+                    i = i + 1;
+                file_name = {"L45_", $sformatf("%0d", i), ".mem"};
+                $display("reading memory L45_%0d", i);
+                $readmemh(file_name, DUT.Memory.i_SRAM_1P_behavioral_bm_bist.memory);
+            end
+        end
+    end
     
     initial begin
         clk = 1'b1;
         rst = 1'b0;
         start = 1'b0;
-        key_size = 5'd7;
+        key_size = 5'd15;
         book_size = 3'd3;
         code_size = 4'd6;
         th_low = 9'd4;
@@ -60,7 +79,6 @@ module tmvs_tb();
         codebook[1] = 7'b0000111;
         codebook[2] = 7'b0101011;
         codebook[3] = 7'b1001010;
-        $readmemh("rand.mem", DUT.Buffer.sram.i_SRAM_1P_behavioral_bm_bist.memory);
         #13
         rst = 1'b1;
         #10
@@ -70,6 +88,11 @@ module tmvs_tb();
         start = 1'b0;
     end
     
+    always_ff @(posedge clk) begin
+        if(DUT.success) begin
+            $display("distance: %0d for codeword: %0h at @: %0d bit: %0d", DUT.distance, DUT.codeword, DUT.checkpoint-(!DUT.Buffer.first)*DUT.OVERLAP+(DUT.index>>4), DUT.index[3:0]);
+        end
+    end
     
     tmvs #(
         .MAX_KEY_SIZE(MAX_KEY_SIZE),  // maximum size of derived key in bits

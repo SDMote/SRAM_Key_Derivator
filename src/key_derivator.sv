@@ -68,16 +68,17 @@ module key_derivator #(
     localparam BOOK_INDX_SIZE = $clog2(MAX_BOOK_SIZE);
     localparam CODE_INDX_SIZE = $clog2(MAX_CODE_SIZE);
     localparam COUNT_SIZE = $clog2(MAX_CYCLES);
-    localparam SUM_SIZE = $clog2(MAX_CODE_SIZE*MAX_CYCLES+1);
+    localparam DIST_SIZE = $clog2(MAX_CODE_SIZE*MAX_CYCLES+1);
     // configurable parameter values 
     logic [KEY_INDX_SIZE-1:0] key_size;
     logic [BOOK_INDX_SIZE-1:0] book_size;
     logic [CODE_INDX_SIZE-1:0] code_size;
-    logic [SUM_SIZE-1:0] th_low;
-    logic [SUM_SIZE-1:0] th_high;
+    logic [DIST_SIZE-1:0] th_low;
+    logic [DIST_SIZE-1:0] th_high;
     logic [COUNT_SIZE-1:0] cycles;
     logic [MAX_CODE_SIZE-1:0] codebook [MAX_BOOK_SIZE-1:0];
     logic [MAX_KEY_SIZE-1:0] new_key;
+    logic start_reg;
     logic done;
     
     enum logic [0:0] {CONF, RUN} state;
@@ -85,6 +86,7 @@ module key_derivator #(
     always_ff @(posedge clock) begin
         if (reset) begin
             state <= CONF;
+            start_reg <= 0;
             key_size <= 15; // 16 bits
             book_size <= 7; // 8 codes
             code_size <= 6; // 7 bits
@@ -97,6 +99,7 @@ module key_derivator #(
             key <= {MAX_KEY_SIZE{1'bx}};
         end
         else begin
+            start_reg <= start;
             case(state)
                 CONF: begin
                     case(index)
@@ -108,7 +111,7 @@ module key_derivator #(
                         'd5: cycles <= param-1;
                         default: codebook[index-6] <= param;
                     endcase
-                    if(start) begin
+                    if((start==1'b1) && (start_reg==1'b0)) begin
                         state <= RUN;
                         valid <= 1'b0;
                     end
@@ -125,7 +128,7 @@ module key_derivator #(
     end
     
     logic [MAX_CODE_SIZE-1:0] codeword;
-    logic [CODE_INDX_SIZE-1:0] code_index;
+    logic [BOOK_INDX_SIZE-1:0] code_index;
     assign codeword = codebook[code_index];
     
     tmvs #(

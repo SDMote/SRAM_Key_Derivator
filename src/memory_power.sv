@@ -30,16 +30,45 @@ module memory_power(
     );
     
     logic on_reg;
+    logic [2:0] counter;
+    enum logic [0:0] {ON, OFF} state;
     
     always_ff @(posedge clock) begin
         if (reset) begin
-            ready <= 0;
-            on_reg <= 0;
+            state <= ON;
+            counter <= 0;
+            on_reg <= 1'b0;
         end
         else begin
             on_reg <= on;
-            ready <= on_reg;
+            case(state)
+                ON: begin
+                    if((on == 1'b0) && (on_reg == 1'b1)) begin
+                        state <= OFF;
+                        counter <= 1;
+                    end
+                end
+                OFF: begin
+                    counter <= counter + 1;
+                    if(counter == 0)
+                        state <= ON;
+                end
+            endcase
         end        
+    end
+    
+    always_comb begin
+        case(state)
+            ON: begin
+                ready = 1'b1;
+                if((on == 1'b0) && (on_reg == 1'b1)) begin
+                    ready = 1'b0;
+                end
+            end
+            OFF: begin
+                ready = 1'b0;
+            end
+        endcase
     end
     
 endmodule
