@@ -19,7 +19,8 @@
 //        .MAX_KEY_SIZE(64),  // maximum size of derived key in bits
 //        .MAX_BOOK_SIZE(32), // maximum number of codewords
 //        .MAX_CODE_SIZE(15), // maximum size of codewords in bits
-//        .MAX_CYCLES(32)     // maximum number of power-on cycles
+//        .MAX_CYCLES(32),    // maximum number of power-on cycles
+//        .WORDS(4)           // number of words read on each powe-on cycle
 //        ) instance_name (
 //        .clock(),       // 1 bit input: clock signal
 //        .reset(),       // 1 bit input: reset signal
@@ -35,7 +36,8 @@ module key_derivator #(
     MAX_KEY_SIZE = 64,  // maximum size of generated key in bits
     MAX_BOOK_SIZE = 32, // maximum number of codewords
     MAX_CODE_SIZE = 15, // maximum size of codewords in bits
-    MAX_CYCLES = 32     // maximum number of power-on cycles
+    MAX_CYCLES = 32,     // maximum number of power-on cycles
+    WORDS = 4
     )(
     clock,
     reset,
@@ -135,7 +137,8 @@ module key_derivator #(
         .MAX_KEY_SIZE(MAX_KEY_SIZE),  // maximum size of derived key in bits
         .MAX_BOOK_SIZE(MAX_BOOK_SIZE), // maximum number of codewords
         .MAX_CODE_SIZE(MAX_CODE_SIZE), // maximum size of codewords in bits
-        .MAX_CYCLES(MAX_CYCLES)     // maximum number of power-on cycles
+        .MAX_CYCLES(MAX_CYCLES),    // maximum number of power-on cycles
+        .WORDS(WORDS)           // number of words read on each powe-on cycle
         ) Control (
         .clock(clock),
         .reset(reset),

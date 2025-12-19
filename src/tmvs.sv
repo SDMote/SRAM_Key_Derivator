@@ -19,7 +19,8 @@
 //        .MAX_KEY_SIZE(64),  // maximum size of derived key in bits
 //        .MAX_BOOK_SIZE(32), // maximum number of codewords
 //        .MAX_CODE_SIZE(15), // maximum size of codewords in bits
-//        .MAX_CYCLES(32)     // maximum number of power-on cycles
+//        .MAX_CYCLES(32),    // maximum number of power-on cycles
+//        .WORDS(4)           // number of words read on each powe-on cycle
 //        ) instance_name (
 //        .clock(),
 //        .reset(),
@@ -41,7 +42,8 @@ module tmvs #(
     MAX_KEY_SIZE = 64,  // maximum size of generated key in bits
     MAX_BOOK_SIZE = 32, // maximum number of codewords
     MAX_CODE_SIZE = 15, // maximum size of codewords in bits
-    MAX_CYCLES = 32     // maximum number of power-on cycles
+    MAX_CYCLES = 32,     // maximum number of power-on cycles
+    WORDS = 4
     )(
     clock,
     reset,
@@ -77,12 +79,10 @@ module tmvs #(
     output logic [MAX_KEY_SIZE-1:0] key;
     output logic done;
     
-    // TODO: this module should provide sequences and advance 1 bit and provide signals to load a new word into the shift register 
     
     localparam WIDTH = 16;
     localparam DEPTH = 1024;
-    localparam OVERLAP = (MAX_CODE_SIZE-1)/WIDTH + 1;
-    localparam WORDS = 4;   // at least OVERLAP + 1
+    localparam OVERLAP = (MAX_CODE_SIZE-1)/WIDTH + 1; // WORDS needs to be at least OVERLAP + 1
     localparam ADDRESS_SIZE = $clog2(DEPTH);
     localparam SUM_SIZE = $clog2(MAX_CYCLES+1);
     localparam WORD_IDX_SIZE = $clog2(WORDS);

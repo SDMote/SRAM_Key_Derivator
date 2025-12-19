@@ -20,6 +20,7 @@ module key_derivator_tb();
     localparam MAX_BOOK_SIZE = 12;
     localparam MAX_CODE_SIZE = 12;
     localparam MAX_CYCLES = 8;
+    localparam WORDS = 4;
     localparam PARAM_NUMBER = MAX_BOOK_SIZE + 6;
     localparam PARAM_INDX_SIZE = $clog2(PARAM_NUMBER);
     
@@ -179,7 +180,8 @@ module key_derivator_tb();
         .MAX_KEY_SIZE(MAX_KEY_SIZE),  // maximum size of derived key in bits
         .MAX_BOOK_SIZE(MAX_BOOK_SIZE), // maximum number of codewords
         .MAX_CODE_SIZE(MAX_CODE_SIZE), // maximum size of codewords in bits
-        .MAX_CYCLES(MAX_CYCLES)     // maximum number of power-on cycles
+        .MAX_CYCLES(MAX_CYCLES),    // maximum number of power-on cycles
+        .WORDS(WORDS)           // number of words read on each powe-on cycle
         ) DUT (
         .clock(clk),       // 1 bit input: clock signal
         .reset(rst),       // 1 bit input: reset signal

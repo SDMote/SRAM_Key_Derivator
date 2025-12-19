@@ -20,6 +20,7 @@ module tmvs_tb();
     localparam MAX_BOOK_SIZE = 8;
     localparam MAX_CODE_SIZE = 8;
     localparam MAX_CYCLES = 32;
+    localparam WORDS = 4;
     localparam KEY_INDX_SIZE = $clog2(MAX_KEY_SIZE);
     localparam BOOK_INDX_SIZE = $clog2(MAX_BOOK_SIZE);
     localparam CODE_INDX_SIZE = $clog2(MAX_CODE_SIZE);
@@ -98,7 +99,8 @@ module tmvs_tb();
         .MAX_KEY_SIZE(MAX_KEY_SIZE),  // maximum size of derived key in bits
         .MAX_BOOK_SIZE(MAX_BOOK_SIZE), // maximum number of codewords
         .MAX_CODE_SIZE(MAX_CODE_SIZE), // maximum size of codewords in bits
-        .MAX_CYCLES(MAX_CYCLES)     // maximum number of power-on cycles
+        .MAX_CYCLES(MAX_CYCLES),    // maximum number of power-on cycles
+        .WORDS(WORDS)           // number of words read on each powe-on cycle
         ) DUT (
         .clock(clk),
         .reset(rst),
