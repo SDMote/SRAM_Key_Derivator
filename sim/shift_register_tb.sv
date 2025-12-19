@@ -55,12 +55,10 @@ module shift_register_tb();
         fill = 1'b1;
         #10
         fill = 1'b0;
-        repeat(15) begin
-            #50
-            shift = 1'b1;
-            #10
-            shift = 1'b0;
-        end
+        #40
+        shift = 1'b1;
+        #150
+        shift = 1'b0;
         #50
         shift = 1'b1;
         checkpoint = ADDR;

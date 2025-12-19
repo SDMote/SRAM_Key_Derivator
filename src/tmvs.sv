@@ -19,7 +19,8 @@
 //        .MAX_KEY_SIZE(64),  // maximum size of derived key in bits
 //        .MAX_BOOK_SIZE(32), // maximum number of codewords
 //        .MAX_CODE_SIZE(15), // maximum size of codewords in bits
-//        .MAX_CYCLES(32)     // maximum number of power-on cycles
+//        .MAX_CYCLES(32),    // maximum number of power-on cycles
+//        .SEQUENCES(32)      // 
 //        ) instance_name (
 //        .clock(),
 //        .reset(),
@@ -41,7 +42,8 @@ module tmvs #(
     MAX_KEY_SIZE = 64,  // maximum size of generated key in bits
     MAX_BOOK_SIZE = 32, // maximum number of codewords
     MAX_CODE_SIZE = 15, // maximum size of codewords in bits
-    MAX_CYCLES = 32     // maximum number of power-on cycles
+    MAX_CYCLES = 32,    // maximum number of power-on cycles
+    SEQUENCES = 32
     )(
     clock,
     reset,
@@ -77,7 +79,6 @@ module tmvs #(
     output logic [MAX_KEY_SIZE-1:0] key;
     output logic done;
     
-    // TODO: this module should provide sequences and advance 1 bit and provide signals to load a new word into the shift register 
     
     enum logic [1:0] {IDLE, RUN, OFF, DONE} state, state_next;
     logic [COUNT_SIZE-1:0] counter, counter_next;
@@ -128,6 +129,7 @@ module tmvs #(
                     end
                     else begin
                         state_next = OFF;
+                        on = 1'b0;
                     end
                 end
                 if(last_cycle) begin // last cycle
@@ -144,37 +146,34 @@ module tmvs #(
                 end
             end
             OFF: begin
-                on = 1'b0;
                 if(ready) begin
                     state_next = RUN;
                     start_segment = 1'b1;
+                end
+                else begin
+                    on = 1'b0;
                 end
             end
             DONE: begin
                 done = 1'b1;
                 if(start==1'b0) begin
                     state_next = IDLE;
+                    bit_count_next = 0;
+                    key_next = {MAX_KEY_SIZE{1'bx}};
                 end
-//                if(start) begin
-//                    state_next = RUN;
-//                    start_segment = 1'b1;
-//                end
             end
         endcase
     end
       
-    localparam SEQUENCES = 32;
-    localparam SEQUENCE_UNROLL = 4;
     
     buffer #(
         .MAX_BOOK_SIZE(MAX_BOOK_SIZE), // maximum number of codewords
         .MAX_CODE_SIZE(MAX_CODE_SIZE), // maximum size of codewords in bits
         .MAX_CYCLES(MAX_CYCLES),    // maximum number of power-on cycles
-        .SEQUENCES(SEQUENCES),     // number of sequences processed together
-        .SEQUENCE_UNROLL(SEQUENCE_UNROLL) // number of sequences processed in parallel
+        .SEQUENCES(SEQUENCES)      // number of sequences processed together
         ) Buffer (
         .clock(clock),       // 1 bit input: clock signal
-        .reset(reset),       // 1 bit input: reset signal
+        .reset(reset||done),       // 1 bit input: reset signal
         .book_size(book_size),   // configured number of codewords
         .code_size(code_size),   // configured codeword size in bits
         .code_index(code_index), 
@@ -184,7 +183,6 @@ module tmvs #(
         .start(start_segment),       //
         .last_cycle(last_cycle),
         .last_sequence(last_sequence),
-//        .advance(advance),
         .success(success),
         .selected_bit(selected_bit)
     );

@@ -24,14 +24,13 @@
 //        .clock(),       // 1 bit input: clock signal
 //        .reset(),       // 1 bit input: reset signal
 //        .enable(),
-//        .restart(),
-//        .book_size(),   // configured number of codewords
-//        .code_size(),   // configured codeword size in bits
+//        .flush(),
 //        .th_low(),      // 
 //        .th_high(),     // 
 //        .index(),
 //        .code_index(), 
-//        .h_distances(), //
+//        .distance(),    //
+//        .success(),     //
 //        .selected_bit() //
 //    );
 //////////////////////////////////////////////////////////////////////////////////
@@ -41,22 +40,18 @@ module selection #(
     MAX_BOOK_SIZE = 32, // maximum number of codewords
     MAX_CODE_SIZE = 15, // maximum size of codewords in bits
     MAX_CYCLES = 10,
-    SEQUENCES = 8,          // number of sequences processed together
-    SEQUENCE_UNROLL = 4     // number of sequences processed in parallel
+    SEQUENCES = 8           // number of sequences processed together
     )(
     clock,
     reset,
     enable,
-    restart,
-    book_size,
-    code_size,
+    flush,
     th_low,
     th_high,
     index,
     code_index,
-    h_distances,
+    distance,
     success,
-    selected_offset,
     selected_bit
     );
     
@@ -65,28 +60,25 @@ module selection #(
     localparam CODE_INDX_SIZE = $clog2(MAX_CODE_SIZE);
     localparam SEQCS_IDX_SIZE = $clog2(SEQUENCES);
     localparam SUM_SIZE = $clog2(MAX_CODE_SIZE*MAX_CYCLES+1);
-    localparam SEQ_UNROLL_SIZE = $clog2(SEQUENCE_UNROLL);
     input  logic clock;
     input  logic reset;
     input  logic enable;
-    input  logic restart;
-    input  logic [BOOK_INDX_SIZE-1:0] book_size;
-    input  logic [CODE_INDX_SIZE-1:0] code_size;
+    input  logic flush;
     input  logic [SUM_SIZE-1:0] th_low;
     input  logic [SUM_SIZE-1:0] th_high;
     input  logic [SEQCS_IDX_SIZE-1:0] index;
     input  logic [BOOK_INDX_SIZE-1:0] code_index;
-    input  logic [CODE_INDX_SIZE-1:0] h_distances [SEQUENCE_UNROLL-1:0];
+    input  logic [CODE_INDX_SIZE-1:0] distance;
     output logic success;
-    output logic [SEQ_UNROLL_SIZE-1:0] selected_offset;
     output logic selected_bit;
     
     
     logic [SUM_SIZE-1:0] sums [SEQUENCES-1:0][MAX_BOOK_SIZE-1:0];
     logic [SUM_SIZE-1:0] sums_next [SEQUENCES-1:0][MAX_BOOK_SIZE-1:0];
+    logic [SUM_SIZE-1:0] current_sum;
     
     always_ff @(posedge clock) begin
-        if (reset) begin
+        if(reset) begin
             for(int i=0; i<SEQUENCES; i++) begin
                 for(int j=0; j<MAX_BOOK_SIZE; j++) begin
                     sums[i][j] <= 0;
@@ -102,31 +94,25 @@ module selection #(
         sums_next = sums;
         success = 1'b0;
         selected_bit = 1'bx;
+        current_sum = sums[index][code_index] + distance;
         if(enable) begin
-            for(int i=0; i<SEQUENCE_UNROLL; i++) begin
-                sums_next[index+i][code_index] = sums[index+i][code_index] + h_distances[i];
-                if(success == 1'b0) begin
-                    if(sums_next[index+i][code_index] <= th_low) begin
-                        success = 1'b1;
-                        selected_offset = i;
-                        selected_bit = 1'b0;
-                    end
-                    if(sums_next[index+i][code_index] >= th_high) begin
-                        success = 1'b1;
-                        selected_offset = i;
-                        selected_bit = 1'b1;
-                    end
-                end
+            if(current_sum <= th_low) begin
+                success = 1'b1;
+                selected_bit = 1'b1;
             end
+            if(current_sum >= th_high) begin
+                success = 1'b1;
+                selected_bit = 1'b0;
+            end
+            sums_next[index][code_index] = current_sum;
         end
-        if(restart) begin
+        if(flush) begin
             for(int i=0; i<SEQUENCES; i++) begin
                 for(int j=0; j<MAX_BOOK_SIZE; j++) begin
                     sums_next[i][j] = 0;
                 end
             end
         end
-        
     end
     
 endmodule

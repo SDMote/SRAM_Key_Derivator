@@ -63,20 +63,20 @@ module shift_register #(
     
     enum logic [1:0] {IDLE, FILL, LOAD, SET} state, state_next;
     logic [WORDS-1:0][WIDTH-1:0] buffer, buffer_next;
-    logic [ADDRESS_SIZE-1:0] address_next;
+    logic [ADDRESS_SIZE-1:0] address_prev;
     logic [WORD_INDX_SIZE-1:0] counter, counter_next;
     
     always_ff @(posedge clock) begin
         if (reset) begin
             state <= IDLE;
             buffer <= {BITS{1'b0}};
-            address <= 0;
+            address_prev <= 0;
             counter <= 0;
         end
         else begin
             state <= state_next;
             buffer <= buffer_next;
-            address <= address_next;
+            address_prev <= address;
             counter <= counter_next;
         end
     end
@@ -84,43 +84,37 @@ module shift_register #(
     always_comb begin
         state_next = state;
         buffer_next = buffer;
-        address_next = address;
+        address = address_prev;
         counter_next = counter;
         full = 1'b0;
         case(state)
             IDLE: begin 
-                address_next = 0;
+                address = checkpoint;
                 counter_next = 0;
                 if(fill) begin
                     state_next = FILL;
-                    address_next = address + 1;
                 end
             end
             FILL: begin
-                counter_next = counter+1;
+                address = address_prev + 1;
+                counter_next = counter + 1;
                 buffer_next = {data, buffer[WORDS-1:1]};
                 if(counter == WORDS-1) begin
                     state_next = LOAD;
-                end
-                else begin
-                    address_next = address + 1;
+                    full = 1'b1;
                 end
             end
             LOAD: begin
                 full = 1'b1;
                 if(shift) begin
-                    address_next = address + 1;
+                    address = address_prev + 1;
                     buffer_next = {data, buffer[WORDS-1:1]};
                 end
                 if(fill) begin
-                    state_next = SET;
-                    address_next = checkpoint;
+                    state_next = FILL;
+                    counter_next = 0;
+                    address = checkpoint;
                 end
-            end
-            SET: begin
-                state_next = FILL;
-                counter_next = 0;
-                address_next = address + 1;
             end
         endcase
     end

@@ -19,7 +19,8 @@
 //        .MAX_KEY_SIZE(64),  // maximum size of derived key in bits
 //        .MAX_BOOK_SIZE(32), // maximum number of codewords
 //        .MAX_CODE_SIZE(15), // maximum size of codewords in bits
-//        .MAX_CYCLES(32)     // maximum number of power-on cycles
+//        .MAX_CYCLES(32),    // maximum number of power-on cycles
+//        .SEQUENCES(32)      // 
 //        ) instance_name (
 //        .clock(),       // 1 bit input: clock signal
 //        .reset(),       // 1 bit input: reset signal
@@ -35,7 +36,8 @@ module key_derivator #(
     MAX_KEY_SIZE = 64,  // maximum size of generated key in bits
     MAX_BOOK_SIZE = 32, // maximum number of codewords
     MAX_CODE_SIZE = 15, // maximum size of codewords in bits
-    MAX_CYCLES = 32     // maximum number of power-on cycles
+    MAX_CYCLES = 32,    // maximum number of power-on cycles
+    SEQUENCES = 32
     )(
     clock,
     reset,
@@ -78,6 +80,7 @@ module key_derivator #(
     logic [COUNT_SIZE-1:0] cycles;
     logic [MAX_CODE_SIZE-1:0] codebook [MAX_BOOK_SIZE-1:0];
     logic [MAX_KEY_SIZE-1:0] new_key;
+    logic start_reg;
     logic done;
     
     enum logic [0:0] {CONF, RUN} state;
@@ -85,6 +88,7 @@ module key_derivator #(
     always_ff @(posedge clock) begin
         if (reset) begin
             state <= CONF;
+            start_reg <= 0;
             key_size <= 15; // 16 bits
             book_size <= 7; // 8 codes
             code_size <= 6; // 7 bits
@@ -97,6 +101,7 @@ module key_derivator #(
             key <= {MAX_KEY_SIZE{1'bx}};
         end
         else begin
+            start_reg <= start;
             case(state)
                 CONF: begin
                     case(index)
@@ -108,7 +113,7 @@ module key_derivator #(
                         'd5: cycles <= param-1;
                         default: codebook[index-6] <= param;
                     endcase
-                    if(start) begin
+                    if((start==1'b1) && (start_reg==1'b0)) begin
                         state <= RUN;
                         valid <= 1'b0;
                     end
@@ -125,14 +130,15 @@ module key_derivator #(
     end
     
     logic [MAX_CODE_SIZE-1:0] codeword;
-    logic [CODE_INDX_SIZE-1:0] code_index;
+    logic [BOOK_INDX_SIZE-1:0] code_index;
     assign codeword = codebook[code_index];
     
     tmvs #(
         .MAX_KEY_SIZE(MAX_KEY_SIZE),  // maximum size of derived key in bits
         .MAX_BOOK_SIZE(MAX_BOOK_SIZE), // maximum number of codewords
         .MAX_CODE_SIZE(MAX_CODE_SIZE), // maximum size of codewords in bits
-        .MAX_CYCLES(MAX_CYCLES)     // maximum number of power-on cycles
+        .MAX_CYCLES(MAX_CYCLES),    // maximum number of power-on cycles
+        .SEQUENCES(SEQUENCES)
         ) Control (
         .clock(clock),
         .reset(reset),
@@ -148,6 +154,5 @@ module key_derivator #(
         .key(new_key),         // MAX_KEY_SIZE bits output: derivated key
         .done(done)         // 1 bit output: key is valid
     );
-
     
 endmodule

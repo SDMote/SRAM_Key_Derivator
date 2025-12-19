@@ -19,8 +19,7 @@
 //        .MAX_BOOK_SIZE(32), // maximum number of codewords
 //        .MAX_CODE_SIZE(15), // maximum size of codewords in bits
 //        .MAX_CYCLES(32),    // maximum number of power-on cycles
-//        .SEQUENCES(32),     // number of sequences processed together
-//        .SEQUENCE_UNROLL(4) // number of sequences processed in parallel
+//        .SEQUENCES(32)      // number of sequences processed together
 //        ) instance_name (
 //        .clock(),       // 1 bit input: clock signal
 //        .reset(),       // 1 bit input: reset signal
@@ -31,7 +30,10 @@
 //        .th_high(),   // 
 //        .codeword(),    //
 //        .start(),       //
-//        .last(),
+//        .last_cycle(),
+//        .last_sequence(),
+//        .success(),
+//        .selected_bit() 
 //    );
 //////////////////////////////////////////////////////////////////////////////////
 
@@ -39,8 +41,7 @@ module buffer #(
     MAX_BOOK_SIZE = 32, // maximum number of codewords
     MAX_CODE_SIZE = 15, // maximum size of codewords in bits
     MAX_CYCLES = 10,
-    SEQUENCES = 8,          // number of sequences processed together
-    SEQUENCE_UNROLL = 4     // number of sequences processed in parallel
+    SEQUENCES = 8           // number of sequences processed together
     )(
     clock,
     reset,
@@ -75,42 +76,32 @@ module buffer #(
     input  logic start;
     input  logic last_cycle;
     output logic last_sequence;
-//    input  logic advance;
     output logic success;
     output logic selected_bit;
     
     
-    localparam MAX_READOUT_SIZE = MAX_CODE_SIZE + SEQUENCE_UNROLL - 1;
-    localparam WORDS = 2 + (MAX_READOUT_SIZE-1) / WIDTH;
+    localparam WORDS = 2 + (MAX_CODE_SIZE-1) / WIDTH;
     localparam WORD_INDX_SIZE = $clog2(WORDS);
     localparam BITS = WORDS * WIDTH;
     localparam DATA_INDX_SIZE = $clog2(WIDTH);
-    localparam SEQ_UNROLL_SIZE = $clog2(SEQUENCE_UNROLL);
     localparam SHIFT_COUNT_SIZE = $clog2(WIDTH+MAX_CODE_SIZE-1)-DATA_INDX_SIZE;
     enum logic [2:0] {IDLE, FILL, RUN, STOP, SHIFT} state, state_next;
     logic [ADDRESS_SIZE-1:0] address;   // memory address
     logic [WIDTH-1:0] read_data;             // memory read data
     logic [BITS-1:0] shift_reg;
     logic [BOOK_INDX_SIZE-1:0] code_index_next;
-//    logic [SUM_SIZE-1:0] sums [SEQUENCES-1:0][MAX_BOOK_SIZE-1:0];
-//    logic [SUM_SIZE-1:0] sums_next [SEQUENCES-1:0][MAX_BOOK_SIZE-1:0];
     logic [SEQCS_IDX_SIZE-1:0] index, index_next;
-    logic [MAX_READOUT_SIZE-1:0] readout, offseted_reg;
+    logic [MAX_CODE_SIZE-1:0] readout, offseted_reg;
     logic [DATA_INDX_SIZE-1:0] offset, offset_next;
     logic [ADDRESS_SIZE+DATA_INDX_SIZE-1:0] checkpoint, checkpoint_next;
     logic fill;
     logic shift;
     logic full;
-    logic restart;
-    logic [CODE_INDX_SIZE-1:0] h_distances [SEQUENCE_UNROLL-1:0];
-    logic [SEQ_UNROLL_SIZE-1:0] selected_offset;
+    logic flush;
+    logic [CODE_INDX_SIZE-1:0] distance;
     
-    // TODO: this module should readout a group of X sequences, then advance X bits to the next group, providing signals to load a new word into the shift register 
-    // not concerned about power on cycles
     
     logic raw_success;
-    logic discard, discard_next;
-    logic [CODE_INDX_SIZE-1:0] discard_count, discard_count_next;
     logic [SHIFT_COUNT_SIZE-1:0] shift_number;
     logic [SHIFT_COUNT_SIZE-1:0] shift_count, shift_count_next;
     
@@ -121,12 +112,6 @@ module buffer #(
             index <= 0;
             code_index <= 0;
             checkpoint <= 0;
-            for(int i=0; i<SEQUENCES; i++) begin
-                for(int j=0; j<MAX_BOOK_SIZE; j++) begin
-                end
-            end
-            discard <= 1'b0;
-            discard_count <= 0;
             shift_count <= 0;
         end
         else begin
@@ -135,8 +120,6 @@ module buffer #(
             index <= index_next;
             code_index <= code_index_next;
             checkpoint <= checkpoint_next;
-            discard_count <= discard_count_next;
-            discard <= discard_next;
             shift_count <= shift_count_next;
         end
     end
@@ -148,14 +131,12 @@ module buffer #(
         index_next = index;
         code_index_next = code_index;
         checkpoint_next = checkpoint;
-        discard_next = discard;
-        discard_count_next = discard_count;
         shift_count_next = shift_count;
         fill = 1'b0;
         shift = 1'b0;
         shift_number = 0;
         last_sequence = 1'b0;
-        restart = 1'b0;
+        flush = 1'b0;
         case(state)
             IDLE: begin 
                 if(start) begin
@@ -172,23 +153,14 @@ module buffer #(
             RUN: begin
                 if(code_index == book_size) begin
                     code_index_next = 0;
-                    if(discard) begin
-                        if(discard_count + 4 >= code_size) begin
-                            discard_count_next = 0;
-                            discard_next = 1'b0;
-                        end
-                        else begin
-                            discard_count_next = discard_count + 4;
-                        end
-                    end
-                    if(index + SEQUENCE_UNROLL >= SEQUENCES) begin
+                    if(index >= SEQUENCES - 1) begin
                         index_next = 0;
                         last_sequence = 1'b1;
                         if(last_cycle) begin
-                            {shift_number, offset_next} = offset + SEQUENCE_UNROLL; 
-                            checkpoint_next = {address+shift_number-WORDS, offset_next};   // update checkpoint
-                            restart = 1'b1;
-                            if(offset + SEQUENCE_UNROLL >= WIDTH) begin // offset expected to overflow
+                            {shift_number, offset_next} = offset + 1; 
+                            checkpoint_next = checkpoint + SEQUENCES;   // update checkpoint
+                            flush = 1'b1;
+                            if(offset >= WIDTH - 1) begin // offset expected to overflow
                                 shift = 1'b1;
                             end
                         end
@@ -198,9 +170,9 @@ module buffer #(
                         end
                     end
                     else begin
-                        offset_next = offset + SEQUENCE_UNROLL; 
-                        index_next = index + SEQUENCE_UNROLL;
-                        if(offset + SEQUENCE_UNROLL >= WIDTH) begin // offset expected to overflow
+                        offset_next = offset + 1; 
+                        index_next = index + 1;
+                        if(offset >= WIDTH - 1) begin // offset expected to overflow
                             shift = 1'b1;
                         end
                     end
@@ -209,29 +181,25 @@ module buffer #(
                     code_index_next = code_index + 1;
                 end
                 if(success) begin
-                    if(index + selected_offset + code_size + 1 >= SEQUENCES) begin
-                        code_index_next = 0;
+                    code_index_next = 0;
+                    {shift_number, offset_next} = offset + code_size + 1; 
+                    if(index + code_size + 1 >= SEQUENCES) begin
                         index_next = 0;
                         last_sequence = 1'b1;
-                        {shift_number, offset_next} = offset + selected_offset + code_size + 1; 
-                        checkpoint_next = {address+shift_number-WORDS, offset_next};   // update checkpoint
-                        restart = 1'b1;
-                        if(shift_number >= 1) begin // offset expected to overflow
-                            shift = 1'b1;
-                            if(shift_number > 1) begin // offset expected to overflow
-                                state_next = SHIFT;
-                                shift_count_next = shift_number - 2;
-                            end
-                        end                        
+                        checkpoint_next = checkpoint + index + code_size + 1;   // update checkpoint
+                        flush = 1'b1;                     
                     end
                     else begin
-                        discard_next = 1'b1;
-                        if(code_index == book_size)
-                            discard_count_next = selected_offset + 4;
-                        else
-                            discard_count_next = selected_offset;
-                    end
+                        index_next = index + code_size + 1;
+                    end 
                 end
+                if(shift_number >= 1) begin
+                    shift = 1'b1;
+                    if(shift_number > 1) begin
+                        state_next = SHIFT;
+                        shift_count_next = shift_number - 2;
+                    end
+                end  
             end
             STOP: begin
                 if(start) begin
@@ -254,41 +222,37 @@ module buffer #(
     end
     
     assign offseted_reg = shift_reg >> offset;
-    assign readout = offseted_reg[MAX_READOUT_SIZE-1:0];
-    assign success = raw_success && last_cycle && !discard;
+    assign readout = offseted_reg[MAX_CODE_SIZE-1:0];
+    assign success = raw_success && last_cycle;
     
     
     selection #(
         .MAX_BOOK_SIZE(MAX_BOOK_SIZE), // maximum number of codewords
         .MAX_CODE_SIZE(MAX_CODE_SIZE), // maximum size of codewords in bits
         .MAX_CYCLES(MAX_CYCLES),    // maximum number of power-on cycles
-        .SEQUENCES(SEQUENCES),     // number of sequences processed together
-        .SEQUENCE_UNROLL(SEQUENCE_UNROLL) // number of sequences processed in parallel
+        .SEQUENCES(SEQUENCES)      // number of sequences processed together
         ) Selector (
         .clock(clock),       // 1 bit input: clock signal
         .reset(reset),       // 1 bit input: reset signal
         .enable(state==RUN),
-        .restart(restart),
-        .book_size(book_size),   // configured number of codewords
-        .code_size(code_size),   // configured codeword size in bits
+        .flush(flush),
         .th_low(th_low),
         .th_high(th_high),
         .index(index),
         .code_index(code_index), 
-        .h_distances(h_distances),    //
+        .distance(distance),    //
         .success(raw_success),
-        .selected_offset(selected_offset),
         .selected_bit(selected_bit)       //
     );
     
-    unrolled_hamming #(
-        .MAX_CODE_SIZE(MAX_CODE_SIZE),     // maximum size of codewords in bits
-        .SEQUENCE_UNROLL(SEQUENCE_UNROLL)     // number of sequences processed together
+    logic [MAX_CODE_SIZE-1:0] mask;
+    assign mask = ~({MAX_CODE_SIZE{1'b1}} << (code_size + 1));
+    hamming_distance #(
+        .WIDTH(MAX_CODE_SIZE)
         ) Hamming (
-        .code_size(code_size),   // configured codeword size in bits
-        .codeword(codeword),    // selected codeword value to calculate distance
-        .readout(readout),     // read sequences
-        .distances(h_distances)    // calculated hamming distances
+        .A(mask & readout),       //
+        .B(mask & codeword),       //
+        .distance(distance) // 
     );
 
     shift_register #(
@@ -307,7 +271,7 @@ module buffer #(
         .full(full)         // 1 bit output: shift register is full
     );
     
-    RM_IHPSG13_1P_1024x16_c2_bm_bist sram (
+    RM_IHPSG13_1P_1024x16_c2_bm_bist Memory (
         .A_ADDR(address),
         .A_CLK(clock),
         .A_DIN('d0),
@@ -315,9 +279,16 @@ module buffer #(
         .A_MEN(1'b1),
         .A_WEN(1'b0),
         .A_REN(1'b1),
-        .A_BM({16{1'b1}}),
+        .A_BM(16'b1),
         .A_BIST_EN(1'b0),
-        .A_DLY()
+        .A_DLY(1'b0),
+        .A_BIST_CLK(1'b0),
+        .A_BIST_MEN(1'b0),
+        .A_BIST_WEN(1'b0),
+        .A_BIST_REN(1'b0),
+        .A_BIST_ADDR(10'b0),
+        .A_BIST_DIN(16'b0), 
+        .A_BIST_BM(16'b0)
     );
     
 endmodule
