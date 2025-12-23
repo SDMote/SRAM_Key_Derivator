@@ -82,11 +82,12 @@ module tmvs #(
     
     localparam WIDTH = 16;
     localparam DEPTH = 1024;
-    localparam OVERLAP = (MAX_CODE_SIZE-1)/WIDTH + 1; // WORDS needs to be at least OVERLAP + 1
+    localparam OVERLAP = (MAX_CODE_SIZE-1)/WIDTH + 1;
+    localparam WORDS_2 = WORDS + OVERLAP;   // number of words needs to be at least OVERLAP + 1
     localparam ADDRESS_SIZE = $clog2(DEPTH);
     localparam SUM_SIZE = $clog2(MAX_CYCLES+1);
-    localparam WORD_IDX_SIZE = $clog2(WORDS);
-    localparam REG_SIZE = WORDS * WIDTH;
+    localparam WORD_IDX_SIZE = $clog2(WORDS_2);
+    localparam REG_SIZE = WORDS_2 * WIDTH;
     localparam REG_IDX_SIZE = $clog2(REG_SIZE);
     localparam BIT_IDX_SIZE = $clog2(WIDTH);
     enum logic [1:0] {IDLE, RUN, OFF, DONE} state, state_next;
@@ -150,7 +151,7 @@ module tmvs #(
             end
             RUN: begin
                 if(last_cycle) begin
-                    if(word_index < WORDS-1)
+                    if(word_index < WORDS_2-1)
                         load = 1'b1;
                     if(index + code_size < ((word_index+1)<<BIT_IDX_SIZE)) begin
                         valid = 1'b1;
@@ -158,7 +159,7 @@ module tmvs #(
                             code_index_next = 0;
                             if(index + code_size >= REG_SIZE-1) begin
                                 counter_next = 0;
-                                index_next = index + 1 - ((WORDS-OVERLAP)<<BIT_IDX_SIZE);;
+                                index_next = index + 1 - (WORDS<<BIT_IDX_SIZE);;
                                 checkpoint_next = address;
                                 shift = 1'b1;
                                 load = 1'b1;
@@ -186,7 +187,7 @@ module tmvs #(
                                 code_index_next = 0;
                                 if(index + (code_size<<1) >= REG_SIZE-2) begin
                                     counter_next = 0;
-                                    index_next = index + code_size + 1 - ((WORDS-OVERLAP)<<BIT_IDX_SIZE);
+                                    index_next = index + code_size + 1 - (WORDS<<BIT_IDX_SIZE);
                                     checkpoint_next = address;
                                     shift = 1'b1;
                                     load = 1'b1;
@@ -249,7 +250,7 @@ module tmvs #(
         .MAX_CYCLES(MAX_CYCLES),// 
         .WIDTH(WIDTH),     // memory word size in bits
         .DEPTH(DEPTH),   // memory number of words
-        .WORDS(WORDS),      // number of words in the shift register
+        .WORDS(WORDS_2),      // number of words in the shift register
         .OVERLAP(OVERLAP)     // number of words to keep from the back of the register when shifting
         ) Buffer (
         .clock(clock),       // 1 bit input: clock signal
