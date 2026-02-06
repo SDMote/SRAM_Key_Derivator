@@ -4,7 +4,7 @@
 // 
 // Create Date: 05.11.2025
 // Design Name: sram_puf
-// Module Name: key_derivator
+// Module Name: security_peripheral
 // Project Name: riscv
 // Description: 
 // 
@@ -15,7 +15,7 @@
 
 
 ///////////////////////////// Instantiation Template /////////////////////////////
-//    key_derivator #(
+//    security_peripheral #(
 //        .MAX_KEY_SIZE(64),  // maximum size of derived key in bits
 //        .MAX_BOOK_SIZE(32), // maximum number of codewords
 //        .MAX_CODE_SIZE(15), // maximum size of codewords in bits
@@ -32,7 +32,7 @@
 //    );
 //////////////////////////////////////////////////////////////////////////////////
 
-module key_derivator #(
+module security_peripheral #(
     MAX_KEY_SIZE = 64,  // maximum size of generated key in bits
     MAX_BOOK_SIZE = 32, // maximum number of codewords
     MAX_CODE_SIZE = 15, // maximum size of codewords in bits
@@ -72,12 +72,6 @@ module key_derivator #(
     localparam COUNT_SIZE = $clog2(MAX_CYCLES);
     localparam SUM_SIZE = $clog2(MAX_CODE_SIZE*MAX_CYCLES+1);
     // configurable parameter values 
-    logic [KEY_INDX_SIZE-1:0] key_size;
-    logic [BOOK_INDX_SIZE-1:0] book_size;
-    logic [CODE_INDX_SIZE-1:0] code_size;
-    logic [SUM_SIZE-1:0] th_low;
-    logic [SUM_SIZE-1:0] th_high;
-    logic [COUNT_SIZE-1:0] cycles;
     logic [MAX_CODE_SIZE-1:0] codebook [MAX_BOOK_SIZE-1:0];
     logic [MAX_KEY_SIZE-1:0] new_key;
     logic start_reg;
@@ -89,12 +83,6 @@ module key_derivator #(
         if (reset) begin
             state <= CONF;
             start_reg <= 0;
-            key_size <= 15; // 16 bits
-            book_size <= 7; // 8 codes
-            code_size <= 6; // 7 bits
-            cycles <= 3;    // 4 cycles
-            th_low <= 4;
-            th_high <= 24;
             for(int i=0; i<MAX_BOOK_SIZE; i++) begin
                 codebook[i] <= 0;
             end
@@ -105,12 +93,6 @@ module key_derivator #(
             case(state)
                 CONF: begin
                     case(index)
-                        'd0: key_size <= param-1;
-                        'd1: book_size <= param-1;
-                        'd2: code_size <= param-1;
-                        'd3: th_low <= param;
-                        'd4: th_high <= param;
-                        'd5: cycles <= param-1;
                         default: codebook[index-6] <= param;
                     endcase
                     if((start==1'b1) && (start_reg==1'b0)) begin
@@ -133,13 +115,13 @@ module key_derivator #(
     logic [BOOK_INDX_SIZE-1:0] code_index;
     assign codeword = codebook[code_index];
     
-    tmvs #(
+    secret_generation #(
         .MAX_KEY_SIZE(MAX_KEY_SIZE),  // maximum size of derived key in bits
         .MAX_BOOK_SIZE(MAX_BOOK_SIZE), // maximum number of codewords
         .MAX_CODE_SIZE(MAX_CODE_SIZE), // maximum size of codewords in bits
         .MAX_CYCLES(MAX_CYCLES),    // maximum number of power-on cycles
         .SEQUENCES(SEQUENCES)
-        ) Control (
+        ) Extractor (
         .clock(clock),
         .reset(reset),
         .start(start),       //

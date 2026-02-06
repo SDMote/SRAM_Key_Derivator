@@ -5,7 +5,7 @@
 // 
 // Create Date: 02.12.2025 16:35:48
 // Design Name: 
-// Module Name: key_derivator_tb
+// Module Name: security_peripheral_tb
 // Project Name: 
 // Target Devices: 
 // Tool Versions: 
@@ -20,7 +20,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 
 
-module key_derivator_tb();
+module security_peripheral_tb();
     
     localparam MAX_KEY_SIZE = 16;
     localparam MAX_BOOK_SIZE = 8;
@@ -176,12 +176,12 @@ module key_derivator_tb();
     end
     
     always_ff @(posedge clk) begin
-        if(DUT.Control.success) begin
-            $display("distance: %0d for codeword: %0h at @: %0d bit: %0d", DUT.Control.Buffer.Selector.current_sum, DUT.Control.codeword, (DUT.Control.Buffer.checkpoint+DUT.Control.Buffer.index)>>4, DUT.Control.Buffer.offset);
+        if(DUT.Extractor.success) begin
+            $display("distance: %0d for codeword: %0h at @: %0d bit: %0d", DUT.Extractor.Buffer.Selector.current_sum, DUT.Extractor.codeword, (DUT.Extractor.Buffer.checkpoint+DUT.Extractor.Buffer.index)>>4, DUT.Extractor.Buffer.offset);
         end
     end
     
-    key_derivator #(
+    security_peripheral #(
         .MAX_KEY_SIZE(MAX_KEY_SIZE),  // maximum size of derived key in bits
         .MAX_BOOK_SIZE(MAX_BOOK_SIZE), // maximum number of codewords
         .MAX_CODE_SIZE(MAX_CODE_SIZE), // maximum size of codewords in bits

@@ -16,18 +16,19 @@
 
 ///////////////////////////// Instantiation Template /////////////////////////////
 //    buffer #(
-//        .MAX_BOOK_SIZE(32), // maximum number of codewords
-//        .MAX_CODE_SIZE(15), // maximum size of codewords in bits
-//        .MAX_CYCLES(32),    // maximum number of power-on cycles
+//        .WIDTH(16),         // memory word size in bits
+//        .DEPTH(1024),       // memory number of words
+//        .BOOK_SIZE(32),     // number of codewords
+//        .CODE_SIZE(15),     // size of codewords in bits
+//        .THRESHOLD(0),      // 
+//        .CYCLES(32),        // number of power-on cycles
 //        .SEQUENCES(32)      // number of sequences processed together
 //        ) instance_name (
 //        .clock(),       // 1 bit input: clock signal
 //        .reset(),       // 1 bit input: reset signal
-//        .book_size(),   // configured number of codewords
-//        .code_size(),   // configured codeword size in bits
+//        .address(),     // 
+//        .read_data(),   // 
 //        .code_index(), 
-//        .th_low(),   // 
-//        .th_high(),   // 
 //        .codeword(),    //
 //        .start(),       //
 //        .last_cycle(),
@@ -38,18 +39,19 @@
 //////////////////////////////////////////////////////////////////////////////////
 
 module buffer #(
-    MAX_BOOK_SIZE = 32, // maximum number of codewords
-    MAX_CODE_SIZE = 15, // maximum size of codewords in bits
-    MAX_CYCLES = 10,
+    WIDTH = 16,         // memory word size in bits
+    DEPTH = 1024,       // memory number of words
+    BOOK_SIZE = 32, // maximum number of codewords
+    CODE_SIZE = 15, // maximum size of codewords in bits
+    THRESHOLD = 0,
+    CYCLES = 10,
     SEQUENCES = 8           // number of sequences processed together
     )(
     clock,
     reset,
-    book_size,  // configured number of codewords
-    code_size,  // configured codeword size in bits
+    address,    // memory address
+    read_data,       // memory data
     code_index, // codeword selection index
-    th_low,
-    th_high,
     codeword,   // selected codeword value
     start,
     last_cycle,
@@ -58,21 +60,17 @@ module buffer #(
     selected_bit
     );
     
-    localparam WIDTH = 16;      // memory word size in bits
-    localparam DEPTH = 1024;    // memory number of words
     localparam ADDRESS_SIZE = $clog2(DEPTH);
-    localparam BOOK_INDX_SIZE = $clog2(MAX_BOOK_SIZE);
-    localparam CODE_INDX_SIZE = $clog2(MAX_CODE_SIZE);
+    localparam BOOK_INDX_SIZE = $clog2(BOOK_SIZE);
+    localparam CODE_INDX_SIZE = $clog2(CODE_SIZE);
     localparam SEQCS_IDX_SIZE = $clog2(SEQUENCES);
-    localparam SUM_SIZE = $clog2(MAX_CODE_SIZE*MAX_CYCLES+1);
+    localparam SUM_SIZE = $clog2(CODE_SIZE*CYCLES+1);
     input  logic clock;
     input  logic reset;
-    input  logic [BOOK_INDX_SIZE-1:0] book_size;
-    input  logic [CODE_INDX_SIZE-1:0] code_size;
-    input  logic [SUM_SIZE-1:0] th_low;
-    input  logic [SUM_SIZE-1:0] th_high;
+    output logic [ADDRESS_SIZE-1:0] address;   // memory address
+    input  logic [WIDTH-1:0] read_data;             // memory read data
     output logic [BOOK_INDX_SIZE-1:0] code_index;
-    input  logic [MAX_CODE_SIZE-1:0] codeword;
+    input  logic [CODE_SIZE-1:0] codeword;
     input  logic start;
     input  logic last_cycle;
     output logic last_sequence;
@@ -80,18 +78,16 @@ module buffer #(
     output logic selected_bit;
     
     
-    localparam WORDS = 2 + (MAX_CODE_SIZE-1) / WIDTH;
+    localparam WORDS = 2 + (CODE_SIZE-1) / WIDTH;
     localparam WORD_INDX_SIZE = $clog2(WORDS);
     localparam BITS = WORDS * WIDTH;
     localparam DATA_INDX_SIZE = $clog2(WIDTH);
-    localparam SHIFT_COUNT_SIZE = $clog2(WIDTH+MAX_CODE_SIZE-1)-DATA_INDX_SIZE;
+    localparam SHIFT_COUNT_SIZE = $clog2(WIDTH+CODE_SIZE-1)-DATA_INDX_SIZE;
     enum logic [2:0] {IDLE, FILL, RUN, STOP, SHIFT} state, state_next;
-    logic [ADDRESS_SIZE-1:0] address;   // memory address
-    logic [WIDTH-1:0] read_data;             // memory read data
     logic [BITS-1:0] shift_reg;
     logic [BOOK_INDX_SIZE-1:0] code_index_next;
     logic [SEQCS_IDX_SIZE-1:0] index, index_next;
-    logic [MAX_CODE_SIZE-1:0] readout, offseted_reg;
+    logic [CODE_SIZE-1:0] readout, offseted_reg;
     logic [DATA_INDX_SIZE-1:0] offset, offset_next;
     logic [ADDRESS_SIZE+DATA_INDX_SIZE-1:0] checkpoint, checkpoint_next;
     logic fill;
@@ -151,7 +147,7 @@ module buffer #(
                 end
             end
             RUN: begin
-                if(code_index == book_size) begin
+                if(code_index == BOOK_SIZE - 1) begin
                     code_index_next = 0;
                     if(index >= SEQUENCES - 1) begin
                         index_next = 0;
@@ -182,15 +178,15 @@ module buffer #(
                 end
                 if(success) begin
                     code_index_next = 0;
-                    {shift_number, offset_next} = offset + code_size + 1; 
-                    if(index + code_size + 1 >= SEQUENCES) begin
+                    {shift_number, offset_next} = offset + CODE_SIZE; 
+                    if(index + CODE_SIZE >= SEQUENCES) begin
                         index_next = 0;
                         last_sequence = 1'b1;
-                        checkpoint_next = checkpoint + index + code_size + 1;   // update checkpoint
+                        checkpoint_next = checkpoint + index + CODE_SIZE;   // update checkpoint
                         flush = 1'b1;                     
                     end
                     else begin
-                        index_next = index + code_size + 1;
+                        index_next = index + CODE_SIZE;
                     end 
                 end
                 if(shift_number >= 1) begin
@@ -222,22 +218,21 @@ module buffer #(
     end
     
     assign offseted_reg = shift_reg >> offset;
-    assign readout = offseted_reg[MAX_CODE_SIZE-1:0];
+    assign readout = offseted_reg[CODE_SIZE-1:0];
     assign success = raw_success && last_cycle;
     
     
     selection #(
-        .MAX_BOOK_SIZE(MAX_BOOK_SIZE), // maximum number of codewords
-        .MAX_CODE_SIZE(MAX_CODE_SIZE), // maximum size of codewords in bits
-        .MAX_CYCLES(MAX_CYCLES),    // maximum number of power-on cycles
+        .BOOK_SIZE(BOOK_SIZE),     // number of codewords
+        .CODE_SIZE(CODE_SIZE),     // size of codewords in bits
+        .THRESHOLD(THRESHOLD),      // 
+        .CYCLES(CYCLES),        // number of power-on cycles
         .SEQUENCES(SEQUENCES)      // number of sequences processed together
         ) Selector (
         .clock(clock),       // 1 bit input: clock signal
         .reset(reset),       // 1 bit input: reset signal
         .enable(state==RUN),
         .flush(flush),
-        .th_low(th_low),
-        .th_high(th_high),
         .index(index),
         .code_index(code_index), 
         .distance(distance),    //
@@ -245,13 +240,11 @@ module buffer #(
         .selected_bit(selected_bit)       //
     );
     
-    logic [MAX_CODE_SIZE-1:0] mask;
-    assign mask = ~({MAX_CODE_SIZE{1'b1}} << (code_size + 1));
     hamming_distance #(
-        .WIDTH(MAX_CODE_SIZE)
+        .WIDTH(CODE_SIZE)
         ) Hamming (
-        .A(mask & readout),       //
-        .B(mask & codeword),       //
+        .A(readout),       //
+        .B(codeword),       //
         .distance(distance) // 
     );
 
@@ -269,26 +262,6 @@ module buffer #(
         .fill(fill),        // 1 bit input: go to checkpoint address and fill shift register
         .shift(shift),       // 1 bit input: load a new word into the dhift register
         .full(full)         // 1 bit output: shift register is full
-    );
-    
-    RM_IHPSG13_1P_1024x16_c2_bm_bist Memory (
-        .A_ADDR(address),
-        .A_CLK(clock),
-        .A_DIN('d0),
-        .A_DOUT(read_data),
-        .A_MEN(1'b1),
-        .A_WEN(1'b0),
-        .A_REN(1'b1),
-        .A_BM(16'b1),
-        .A_BIST_EN(1'b0),
-        .A_DLY(1'b0),
-        .A_BIST_CLK(1'b0),
-        .A_BIST_MEN(1'b0),
-        .A_BIST_WEN(1'b0),
-        .A_BIST_REN(1'b0),
-        .A_BIST_ADDR(10'b0),
-        .A_BIST_DIN(16'b0), 
-        .A_BIST_BM(16'b0)
     );
     
 endmodule
