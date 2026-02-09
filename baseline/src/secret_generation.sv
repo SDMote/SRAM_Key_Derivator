@@ -145,11 +145,11 @@ module secret_generation #(
             end
             DONE: begin
                 done = 1'b1;
-                if(start==1'b0) begin
-                    state_next = IDLE;
-                    bit_count_next = 0;
-                    key_next = {KEY_SIZE{1'bx}};
-                end
+//                if(start==1'b0) begin
+//                    state_next = IDLE;
+//                    bit_count_next = 0;
+//                    key_next = {KEY_SIZE{1'bx}};
+//                end
             end
         endcase
     end

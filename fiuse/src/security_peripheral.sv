@@ -19,7 +19,7 @@
 //        .KEY_SIZE(64),  // size of derived key in bits
 //        .THRESHOLD(1),  // 
 //        .CYCLES(32),    // number of power-on cycles
-//        .SEQUENCES(32)      // 
+//        .WORDS(4),      // 
 //        ) instance_name (
 //        .clock(),       // 1 bit input: clock signal
 //        .reset()        // 1 bit input: reset signal
@@ -29,8 +29,8 @@
 module security_peripheral #(
     KEY_SIZE = 64,  // size of generated key in bits
     THRESHOLD = 1,
-    CYCLES = 32,    // number of power-on cycles
-    SEQUENCES = 32
+    CYCLES = 32,     // number of power-on cycles
+    WORDS = 4
     )(
     clock,
     reset
@@ -62,7 +62,7 @@ module security_peripheral #(
     always_ff @(posedge clock) begin
         if (reset) begin
             state <= RUN;
-            start <= 1'b0;
+            start <= 0;
             key <= {KEY_SIZE{1'bx}};
         end
         else begin
@@ -81,18 +81,18 @@ module security_peripheral #(
             endcase
         end
     end
-        
+    
     logic [CODE_SIZE-1:0] codeword;
     logic [BOOK_INDX_SIZE-1:0] code_index;
     assign codeword = codebook[code_index];
     
-    secret_generation #(
-        .KEY_SIZE(KEY_SIZE),  // maximum size of derived key in bits
-        .BOOK_SIZE(BOOK_SIZE), // maximum number of codewords
-        .CODE_SIZE(CODE_SIZE), // maximum size of codewords in bits
-        .THRESHOLD(THRESHOLD),      // 
-        .CYCLES(CYCLES),    // maximum number of power-on cycles
-        .SEQUENCES(SEQUENCES)
+    secret_generator #(
+        .KEY_SIZE(KEY_SIZE),  // size of derived key in bits
+        .BOOK_SIZE(BOOK_SIZE), // number of codewords
+        .CODE_SIZE(CODE_SIZE), // size of codewords in bits
+        .THRESHOLD(THRESHOLD),  // 
+        .CYCLES(CYCLES),    // number of power-on cycles
+        .WORDS(WORDS)           // number of words read on each powe-on cycle
         ) Extractor (
         .clock(clock),
         .reset(reset),
@@ -102,11 +102,11 @@ module security_peripheral #(
         .key(new_key),         // MAX_KEY_SIZE bits output: derivated key
         .done(done)         // 1 bit output: key is valid
     );
-    
+
 
 ///////////////////////////////// User Functions /////////////////////////////////
     
     
 //////////////////////////////////////////////////////////////////////////////////
-
+    
 endmodule

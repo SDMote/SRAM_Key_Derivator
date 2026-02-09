@@ -1,19 +1,13 @@
 `timescale 1ns / 1ps
 //////////////////////////////////////////////////////////////////////////////////
-// Company: 
-// Engineer: 
+// Engineer: Alfonso Cortés
 // 
-// Create Date: 02.12.2025 16:35:48
-// Design Name: 
+// Create Date: 05.11.2025
+// Design Name: sram_puf
 // Module Name: security_peripheral_tb
-// Project Name: 
-// Target Devices: 
-// Tool Versions: 
+// Project Name: riscv
 // Description: 
 // 
-// Dependencies: 
-// 
-// Revision:
 // Revision 0.01 - File Created
 // Additional Comments:
 // 
@@ -27,7 +21,7 @@ module security_peripheral_tb();
     localparam CODE_SIZE = 7;
     localparam THRESHOLD = 1;
     localparam CYCLES = 4;
-    localparam SEQUENCES = 32;
+    localparam WORDS = 4;
     
     logic clk, rst;
     logic [KEY_SIZE-1:0] key;
@@ -60,7 +54,7 @@ module security_peripheral_tb();
             end
         end
     end
-    
+       
     initial begin
         clk = 1'b1;
         rst = 1'b0;
@@ -72,15 +66,15 @@ module security_peripheral_tb();
     
     always_ff @(posedge clk) begin
         if(DUT.Extractor.success) begin
-            $display("distance: %0d for codeword: %0h at @: %0d bit: %0d", DUT.Extractor.Buffer.Selector.current_sum, DUT.Extractor.codeword, (DUT.Extractor.Buffer.checkpoint+DUT.Extractor.Buffer.index)>>4, DUT.Extractor.Buffer.offset);
+            $display("distance: %0d for codeword: %0h at @: %0d bit: %0d", DUT.Extractor.distance, DUT.Extractor.codeword, DUT.Extractor.checkpoint-(!DUT.Extractor.Buffer.first)*DUT.Extractor.OVERLAP+(DUT.Extractor.index>>4), DUT.Extractor.index[3:0]);
         end
     end
     
     security_peripheral #(
         .KEY_SIZE(KEY_SIZE),  // maximum size of derived key in bits
-        .THRESHOLD(THRESHOLD),      // 
+        .THRESHOLD(THRESHOLD),  // 
         .CYCLES(CYCLES),    // maximum number of power-on cycles
-        .SEQUENCES(SEQUENCES)
+        .WORDS(WORDS)           // number of words read on each powe-on cycle
         ) DUT (
         .clock(clk),       // 1 bit input: clock signal
         .reset(rst)        // 1 bit input: reset signal
