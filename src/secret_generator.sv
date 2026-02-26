@@ -91,7 +91,6 @@ module secret_generator #(
     logic [MAX_KEY_SIZE-1:0] key_next;
     logic [UNSTABILITY_SIZE-1:0] unstability_next;
     logic [ADDRESS_SIZE-1:0] checkpoint, checkpoint_next;
-    logic [REG_IDX_SIZE-1:0] index, index_next;
     logic [COUNT_SIZE-1:0] counter, counter_next;
     logic [WORD_CNT_SIZE-1:0] required_words, word_count, word_count_next;
     logic [SUM_SIZE-1:0] sums [REG_SIZE-1:0];
@@ -110,19 +109,17 @@ module secret_generator #(
             state <= IDLE;
             checkpoint <= 0;
             counter <= 0;
-            index <= 0;
             word_count <= 0;
-            key <= {MAX_KEY_SIZE{1'bx}};
-            unstability <= {METRIC_SIZE{1'b0}};
+            key <= {MAX_KEY_SIZE{1'b0}};
+            unstability <= {UNSTABILITY_SIZE{1'b0}};
         end
         else begin
             state <= state_next;
             checkpoint <= checkpoint_next;
             counter <= counter_next;
-            index <= index_next;
             word_count <= word_count_next;
-            key <= key_next;
-            unstability <= unstability_next;
+            key[MAX_KEY_SIZE-1:0] <= key_next[MAX_KEY_SIZE-1:0];
+            unstability[UNSTABILITY_SIZE-1:0] <= unstability_next[UNSTABILITY_SIZE-1:0];
         end
     end
     
@@ -130,10 +127,9 @@ module secret_generator #(
         state_next = state;
         checkpoint_next = checkpoint;
         counter_next = counter;
-        index_next = index;
         word_count_next = word_count;
-        key_next = key;
-        unstability_next = unstability;
+        key_next[MAX_KEY_SIZE-1:0] = key[MAX_KEY_SIZE-1:0];
+        unstability_next[UNSTABILITY_SIZE-1:0] = unstability[UNSTABILITY_SIZE-1:0];
         load = 1'b0;
         stop = 1'b0;
         shift = 1'b0;
@@ -203,7 +199,7 @@ module secret_generator #(
         endcase
         if(enable==1'b0) begin
             state_next = IDLE;
-            key_next = {MAX_KEY_SIZE{1'bx}};
+            key_next = {MAX_KEY_SIZE{1'b0}};
             unstability_next = {METRIC_SIZE{1'b0}};
             checkpoint_next = start_address;
             counter_next = 0;

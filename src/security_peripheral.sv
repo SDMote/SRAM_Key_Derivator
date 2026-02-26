@@ -27,7 +27,10 @@
 //        .cycles(),          // 
 //        .start_address(),   // 
 //        .start(),           // 1 bit input: start signal
-//        .key(),             // MAX_KEY_SIZE bits output: derivated key
+//        .key_0(),           // BUS_WIDTH bits output: LSB of the derivated key
+//        .key_1(),           // BUS_WIDTH bits output: part of the derivated key
+//        .key_2(),           // BUS_WIDTH bits output: part of the derivated key
+//        .key_3(),           // BUS_WIDTH bits output: MSB of the derivated key
 //        .unstability(),     // clog2(MAX_KEY_SIZE)+(1<<METRIC_SIZE)-1 bits output: unstability metric
 //        .valid(),           // 1 bit input: key valid flag
 //        .read_data(),       // 
@@ -37,9 +40,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 
 module security_peripheral #(
-    MAX_KEY_SIZE = 128,  // maximum size of generated key in bits
     MAX_CYCLES = 127,    // maximum number of power-on cycles
-    METRIC_SIZE = 3,
+    METRIC_SIZE = 4,
     WORDS = 4
     )(
     clock,
@@ -48,7 +50,10 @@ module security_peripheral #(
     cycles,
     start_address,
     start,
-    key,
+    key_0,
+    key_1,
+    key_2,
+    key_3,
     unstability,
     valid,
     read_data,
@@ -56,6 +61,8 @@ module security_peripheral #(
     sram_rdy
     );
         
+    localparam MAX_KEY_SIZE = 128;  // maximum size of generated key in bits
+    localparam BUS_WIDTH = 32;      // width of the system bus
     localparam MEMORY_WIDTH = 8;
     localparam MEMORY_DEPTH = 256;
     localparam ADDRESS_SIZE = $clog2(MEMORY_DEPTH);
@@ -72,7 +79,10 @@ module security_peripheral #(
     output logic [MEMORY_WIDTH-1:0] read_data;
     output logic sram_on;
     input  logic sram_rdy;
-    output logic [MAX_KEY_SIZE-1:0] key;
+    output logic [BUS_WIDTH-1:0] key_0;
+    output logic [BUS_WIDTH-1:0] key_1;
+    output logic [BUS_WIDTH-1:0] key_2;
+    output logic [BUS_WIDTH-1:0] key_3;
     output logic [UNSTABILITY_SIZE-1:0] unstability;
     output logic valid;
     
@@ -80,13 +90,17 @@ module security_peripheral #(
     logic [COUNT_SIZE-1:0] cycles_reg;
     logic [ADDRESS_SIZE-1:0] start_address_reg;
     logic [ADDRESS_SIZE-1:0] address;
-    logic [MAX_KEY_SIZE-1:0] new_key;
+    logic [MAX_KEY_SIZE-1:0] key, new_key;
     logic [UNSTABILITY_SIZE-1:0] new_unstability;
     logic enable;
     logic start_reg;
     logic done;
     
     enum logic [1:0] {IDLE, RUN, SRAM} state;
+    assign key_0 = key[1*BUS_WIDTH-1:0*BUS_WIDTH];
+    assign key_1 = key[2*BUS_WIDTH-1:1*BUS_WIDTH];
+    assign key_2 = key[3*BUS_WIDTH-1:2*BUS_WIDTH];
+    assign key_3 = key[4*BUS_WIDTH-1:3*BUS_WIDTH];
     
     always_ff @(posedge clock) begin
         if (reset) begin
@@ -112,7 +126,7 @@ module security_peripheral #(
                         state <= SRAM;
                         enable <= 1'b0;
                         valid <= 1'b0;
-                        key = {MAX_KEY_SIZE{1'bx}};
+                        key <= {MAX_KEY_SIZE{1'bx}};
                         unstability <= {UNSTABILITY_SIZE{1'bx}};
                     end
                 end
@@ -122,17 +136,17 @@ module security_peripheral #(
                     end
                 end
                 RUN: begin
-                    enable = 1'b1;
+                    enable <= 1'b1;
                     if(start==1'b1 && start_reg==1'b0) begin
                         state <= SRAM; 
                         enable <= 1'b0;
                         valid <= 1'b0;
-                        key = {MAX_KEY_SIZE{1'bx}};
+                        key <= {MAX_KEY_SIZE{1'bx}};
                         unstability <= {UNSTABILITY_SIZE{1'bx}};
                     end
                     if(done) begin
                         state <= IDLE;
-                        key <= new_key;
+                        key[MAX_KEY_SIZE-1:0] <= new_key[MAX_KEY_SIZE-1:0];
                         unstability <= new_unstability;
                         valid <= 1'b1;
                     end
@@ -162,7 +176,7 @@ module security_peripheral #(
         .cycles(cycles_reg),      // configured number of power-on cycles
         .sram_on(sram_on),         // 1 bit output:
         .sram_rdy(sram_rdy),        // 1 bit input:
-        .key(new_key),         // MAX_KEY_SIZE bits output: derivated key
+        .key(new_key[MAX_KEY_SIZE-1:0]),         // MAX_KEY_SIZE bits output: derivated key
         .unstability(new_unstability),     // clog2(MAX_KEY_SIZE) + clog2(MAX_CYCLES/2) bits output: unstability metric
         .done(done)         // 1 bit output: key is valid
     );

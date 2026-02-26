@@ -23,6 +23,7 @@
 module security_peripheral_tb();
     
     localparam MAX_KEY_SIZE = 128;
+    localparam BUS_WIDTH = 32;      // width of the system bus
     localparam MAX_CYCLES = 127;
     localparam METRIC_SIZE = 4;
     localparam WORDS = 4;
@@ -39,12 +40,14 @@ module security_peripheral_tb();
     logic [KEY_INDX_SIZE-1:0] key_size;
     logic [COUNT_SIZE-1:0] cycles;
     logic [MAX_KEY_SIZE-1:0] key;
+    logic [BUS_WIDTH-1:0] key_0, key_1, key_2, key_3;
     logic [UNSTABILITY_SIZE-1:0] unstability;
     int i;
     string number;
     string file_name;
     
     always #5 clk = ~clk;
+    assign key = {key_3, key_2, key_1, key_0};
         
     always_ff @(posedge clk) begin
         if(rst) begin
@@ -94,13 +97,21 @@ module security_peripheral_tb();
         #10
         start = 1'b1;
         #10
-        start_address = 8'd0;
+        start_address = 8'd8;
         #10
         start = 1'b0;
         #10
         start = 1'b1;      
         #1500  
+        start_address = 8'd4;
         cycles = 8'd31;
+        start = 1'b0;
+        #10
+        start = 1'b1;
+        #3000  
+        start_address = 8'd0;
+        cycles = 8'd5;
+        key_size = 8'd128;
         start = 1'b0;
         #10
         start = 1'b1;
@@ -113,7 +124,6 @@ module security_peripheral_tb();
     end
     
     security_peripheral #(
-        .MAX_KEY_SIZE(MAX_KEY_SIZE),  // maximum size of derived key in bits
         .MAX_CYCLES(MAX_CYCLES),   // 
         .METRIC_SIZE(METRIC_SIZE),    // significant figures in bit-unstability metrics
         .WORDS(WORDS)          // number of words in the shift register
@@ -124,7 +134,10 @@ module security_peripheral_tb();
         .cycles(cycles),          // configured number of power-on cycles
         .start_address(start_address),   // clog2(WIDTH) bits output: memory address
         .start(start),           // 1 bit input: start signal
-        .key(key),             // MAX_KEY_SIZE bits output: derivated key
+        .key_0(key_0),             // BUS_WIDTH bits output: LSB of the derivated key
+        .key_1(key_1),             // BUS_WIDTH bits output: part of the derivated key
+        .key_2(key_2),             // BUS_WIDTH bits output: part of the derivated key
+        .key_3(key_3),             // BUS_WIDTH bits output: MSB of the derivated key
         .unstability(unstability),     // clog2(MAX_KEY_SIZE)+(1<<METRIC_SIZE)-1 bits output: unstability metric
         .valid(valid),            // 1 bit input: key is valid
         .read_data(read_data),       // WIDTH bits input: memory data
